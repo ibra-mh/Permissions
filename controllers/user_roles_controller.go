@@ -50,7 +50,6 @@ func GetUserRole(db *sql.DB) http.HandlerFunc {
 		json.NewEncoder(w).Encode(userRole)
 	}
 }
-
 func CreateUserRole(db *sql.DB) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		var userRole models.UserRole
@@ -59,7 +58,20 @@ func CreateUserRole(db *sql.DB) http.HandlerFunc {
 			return
 		}
 
-		err := db.QueryRow("INSERT INTO user_roles (email, role_id) VALUES ($1, $2) RETURNING id, created_at, updated_at", userRole.Email, userRole.RoleID).
+		// Check if the role exists and is not deleted
+		var exists bool
+		err := db.QueryRow("SELECT EXISTS (SELECT 1 FROM roles WHERE id = $1 AND deleted_at IS NULL)", userRole.RoleID).Scan(&exists)
+		if err != nil {
+			http.Error(w, "Error validating role ID", http.StatusInternalServerError)
+			return
+		}
+		if !exists {
+			http.Error(w, "Role is either deleted or does not exist", http.StatusBadRequest)
+			return
+		}
+
+		// Insert the user role
+		err = db.QueryRow("INSERT INTO user_roles (email, role_id) VALUES ($1, $2) RETURNING id, created_at, updated_at", userRole.Email, userRole.RoleID).
 			Scan(&userRole.ID, &userRole.CreatedAt, &userRole.UpdatedAt)
 		if err != nil {
 			http.Error(w, err.Error(), http.StatusInternalServerError)
@@ -69,6 +81,25 @@ func CreateUserRole(db *sql.DB) http.HandlerFunc {
 		json.NewEncoder(w).Encode(userRole)
 	}
 }
+
+// func CreateUserRole(db *sql.DB) http.HandlerFunc {
+// 	return func(w http.ResponseWriter, r *http.Request) {
+// 		var userRole models.UserRole
+// 		if err := json.NewDecoder(r.Body).Decode(&userRole); err != nil {
+// 			http.Error(w, err.Error(), http.StatusBadRequest)
+// 			return
+// 		}
+
+// 		err := db.QueryRow("INSERT INTO user_roles (email, role_id) VALUES ($1, $2) RETURNING id, created_at, updated_at", userRole.Email, userRole.RoleID).
+// 			Scan(&userRole.ID, &userRole.CreatedAt, &userRole.UpdatedAt)
+// 		if err != nil {
+// 			http.Error(w, err.Error(), http.StatusInternalServerError)
+// 			return
+// 		}
+
+// 		json.NewEncoder(w).Encode(userRole)
+// 	}
+// }
 
 func UpdateUserRole(db *sql.DB) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
@@ -81,7 +112,21 @@ func UpdateUserRole(db *sql.DB) http.HandlerFunc {
 			return
 		}
 
-		_, err := db.Exec("UPDATE user_roles SET email = $1, role_id = $2, updated_at = CURRENT_TIMESTAMP WHERE id = $3 AND deleted_at IS NULL", userRole.Email, userRole.RoleID, id)
+		// Check if the role exists and is not deleted
+		var exists bool
+		err := db.QueryRow("SELECT EXISTS (SELECT 1 FROM roles WHERE id = $1 AND deleted_at IS NULL)", userRole.RoleID).Scan(&exists)
+		if err != nil {
+			http.Error(w, "Error validating role ID", http.StatusInternalServerError)
+			return
+		}
+		if !exists {
+			http.Error(w, "Role is either deleted or does not exist", http.StatusBadRequest)
+			return
+		}
+
+		// Update the user role
+		_, err = db.Exec("UPDATE user_roles SET email = $1, role_id = $2, updated_at = CURRENT_TIMESTAMP WHERE id = $3 AND deleted_at IS NULL", 
+			userRole.Email, userRole.RoleID, id)
 		if err != nil {
 			http.Error(w, err.Error(), http.StatusInternalServerError)
 			return
@@ -90,6 +135,29 @@ func UpdateUserRole(db *sql.DB) http.HandlerFunc {
 		json.NewEncoder(w).Encode(userRole)
 	}
 }
+
+
+
+// func UpdateUserRole(db *sql.DB) http.HandlerFunc {
+// 	return func(w http.ResponseWriter, r *http.Request) {
+// 		vars := mux.Vars(r)
+// 		id := vars["id"]
+
+// 		var userRole models.UserRole
+// 		if err := json.NewDecoder(r.Body).Decode(&userRole); err != nil {
+// 			http.Error(w, err.Error(), http.StatusBadRequest)
+// 			return
+// 		}
+
+// 		_, err := db.Exec("UPDATE user_roles SET email = $1, role_id = $2, updated_at = CURRENT_TIMESTAMP WHERE id = $3 AND deleted_at IS NULL", userRole.Email, userRole.RoleID, id)
+// 		if err != nil {
+// 			http.Error(w, err.Error(), http.StatusInternalServerError)
+// 			return
+// 		}
+
+// 		json.NewEncoder(w).Encode(userRole)
+// 	}
+// }
 
 func DeleteUserRole(db *sql.DB) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
