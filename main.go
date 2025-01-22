@@ -31,8 +31,10 @@ func main() {
 			role_id INT NOT NULL REFERENCES roles(id),
 			created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
 			updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-			deleted_at TIMESTAMP
+			deleted_at TIMESTAMP,
+			CONSTRAINT unique_email_role UNIQUE (email, role_id)
 		);
+		
 	`)
 	if err != nil {
 		log.Fatal(err)
